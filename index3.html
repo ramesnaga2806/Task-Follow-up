@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SSWR Task Manager</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 20px; }
+    h2 { margin-bottom: 10px; }
+    form input, form textarea, form select, form button {
+      margin: 5px 0; display: block; width: 100%; max-width: 400px; padding: 8px;
+    }
+    table { border-collapse: collapse; width: 100%; margin-top: 20px; }
+    table, th, td { border: 1px solid #ccc; }
+    th, td { padding: 8px; text-align: left; }
+    button.complete-btn { background-color: #28a745; color: #fff; border: none; padding: 5px 10px; cursor: pointer; }
+  </style>
+</head>
+<body>
+  <h2>SSWR Task Manager</h2>
+  <p><strong>Note:</strong> Tasks are saved to Google Sheet.</p>
+
+  <!-- Department Filter -->
+  <label for="departmentFilter"><strong>View Department:</strong></label>
+  <select id="departmentFilter">
+    <option value="All">All</option>
+    <option value="Inbound">Inbound</option>
+    <option value="Outbound">Outbound</option>
+    <option value="Wave Planner">Wave Planner</option>
+    <option value="Inventory">Inventory</option>
+    <option value="Rework">Rework</option>
+    <option value="Return">Return</option>
+    <option value="PTC">PTC</option>
+    <option value="PTL">PTL</option>
+    <option value="Admin">Admin</option>
+  </select>
+
+  <!-- Add Task Form -->
+  <form id="taskForm">
+    <input type="text" id="title" placeholder="Title" required />
+    <input type="text" id="emailSubject" placeholder="Email Subject (Optional)" />
+    <input type="text" id="requestBy" placeholder="Request By" required />
+    <textarea id="remark" placeholder="Remark"></textarea>
+    <select id="department" required>
+      <option value="">Select Department</option>
+      <option value="Inbound">Inbound</option>
+      <option value="Outbound">Outbound</option>
+      <option value="Wave Planner">Wave Planner</option>
+      <option value="Inventory">Inventory</option>
+      <option value="Rework">Rework</option>
+      <option value="Return">Return</option>
+      <option value="PTC">PTC</option>
+      <option value="PTL">PTL</option>
+      <option value="Admin">Admin</option>
+    </select>
+    <button type="submit">Add Task</button>
+  </form>
+
+  <!-- Task Table -->
+  <table id="taskTable">
+    <thead>
+      <tr>
+        <th>Department</th>
+        <th>Title</th>
+        <th>Email Subject</th>
+        <th>Request By</th>
+        <th>Remark</th>
+        <th>Created Date & Time</th>
+        <th>Incharge Person</th>
+        <th>Status of Progress</th>
+        <th>Update Remark</th>
+        <th>Current Date & Time</th>
+        <th>Complete Task</th>
+      </tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+
+  <script>
+    const taskForm = document.getElementById("taskForm");
+    const taskTable = document.getElementById("taskTable").querySelector("tbody");
+    const departmentFilter = document.getElementById("departmentFilter");
+
+    // ✅ Updated with your new Deployment Web App URL
+    const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzIAgo7Vl29lHwrg-aas0xj2YjGlKN6qijvom4andpSQzK380mxoCyHyZlYOVEUhlsdEA/exec";
+
+    function getCurrentDateTime() {
+      return new Date().toLocaleString();
+    }
+
+    taskForm.addEventListener("submit", function(e) {
+      e.preventDefault();
+
+      const title = document.getElementById("title").value;
+      const emailSubject = document.getElementById("emailSubject").value;
+      const requestBy = document.getElementById("requestBy").value;
+      const remark = document.getElementById("remark").value;
+      const department = document.getElementById("department").value;
+      const createdDate = getCurrentDateTime();
+
+      const row = taskTable.insertRow();
+      row.setAttribute("data-department", department);
+
+      row.insertCell(0).innerText = department;
+      row.insertCell(1).innerText = title;
+      row.insertCell(2).innerText = emailSubject;
+      row.insertCell(3).innerText = requestBy;
+      row.insertCell(4).innerText = remark;
+      row.insertCell(5).innerText = createdDate;
+      row.insertCell(6).contentEditable = "true";
+
+      const statusCell = row.insertCell(7);
+      const select = document.createElement("select");
+      ["Open", "Progress", "Complete"].forEach(optText => {
+        const opt = document.createElement("option");
+        opt.value = optText;
+        opt.textContent = optText;
+        select.appendChild(opt);
+      });
+      select.value = "Open";
+      statusCell.appendChild(select);
+
+      row.insertCell(8).contentEditable = "true";
+
+      const currentTimeCell = row.insertCell(9);
+      currentTimeCell.innerText = getCurrentDateTime();
+
+      select.addEventListener("change", () => {
+        currentTimeCell.innerText = getCurrentDateTime();
+      });
+      row.cells[8].addEventListener("input", () => {
+        currentTimeCell.innerText = getCurrentDateTime();
+      });
+      row.cells[6].addEventListener("input", () => {
+        currentTimeCell.innerText = getCurrentDateTime();
+      });
+
+      const completeCell = row.insertCell(10);
+      const completeBtn = document.createElement("button");
+      completeBtn.textContent = "Complete Task";
+      completeBtn.className = "complete-btn";
+      completeBtn.onclick = function() {
+        select.value = "Complete";
+        currentTimeCell.innerText = getCurrentDateTime();
+        row.remove(); // ✅ no download, only remove
+      };
+      completeCell.appendChild(completeBtn);
+
+      // ✅ Send to Google Sheet via your Web App
+      fetch(GOOGLE_SCRIPT_URL, {
+        method: "POST",
+        body: JSON.stringify({
+          department,
+          title,
+          emailSubject,
+          requestBy,
+          remark,
+          createdDate,
+          inchargePerson: "",
+          status: "Open",
+          updateRemark: "",
+          currentDate: createdDate
+        }),
+        headers: {
+          "Content-Type": "application/json"
+        }
+      })
+      .then(res => res.text())
+      .then(response => {
+        console.log("Saved to Google Sheet:", response);
+        alert("Task saved successfully!");
+      })
+      .catch(err => {
+        console.error("Error:", err);
+        alert("Failed to save task.");
+      });
+
+      taskForm.reset();
+      filterTasks();
+    });
+
+    departmentFilter.addEventListener("change", filterTasks);
+
+    function filterTasks() {
+      const selectedDept = departmentFilter.value;
+      for (let row of taskTable.rows) {
+        const dept = row.getAttribute("data-department");
+        row.style.display = (selectedDept === "All" || dept === selectedDept) ? "" : "none";
+      }
+    }
+  </script>
+</body>
+</html>
